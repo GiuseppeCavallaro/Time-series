@@ -1,0 +1,46 @@
+library(boot)
+library(tseries)
+nasdaq # the data
+ts<- ts(nasdaq$Close)  #write the data in time series form
+logts<- log(ts)  # the log-trasform of the closing values
+plot(logts)       
+
+acfn<- acf(logts, lag.max = NULL) # the autocorrelation function of the log-trasform closing values 
+pacfn<- pacf(logts) # partial autocorrelation function of the log-trasform closing values 
+test<- adf.test(logts)# the augmented Dickey fuller test 
+         #suggests that the time series is stationary using 11, for eliminate autocorrelation
+
+
+fit1<- arma(logts, order = c(0,11), lag = NULL )# fit a MA(11) onto the logts data set
+
+res<- resid(fit1) #take the residual from fit1
+res1<- na.omit(res) # eliminate the first 11 observation, wich are missing
+standard<- function(x){m= mean(x)
+s= (var(x)^0.5)
+z= (x-m)/s
+return (z)}
+
+res2<- standard(res1)
+
+plot(density(res2)) # plot the cumulative density function of the residuals
+acf1<- acf(res2)  # plot the autocorrelation function
+test2<- Box.test(res2) # verify the absence of autocorrelation among the residuals
+qqnorm(res2) # the theoretical distribution 
+abline(0,1)
+hist(res2) # histogram of the residuals
+
+bootf<- function (tsb) {#with the bootf function 
+  fit<- arma(tsb, order = c(0,11))#we estimate a MA(11) for each time series, bootstrapped from the original time series 
+  return(coef(fit)[1]) # and storage the coefficiets for each MA estimated
+}
+
+nasdaqboot<- tsboot(logts, bootf , 1000, l=20, sim ="fixed") # with the tsboot 
+#we apply the moving block bootstrap to the logts data, using the bootf function to estimate
+#the coefficients of the MA (11).
+
+meannasdaq<-mean(nasdaqboot$t[,1]) # calculate the mean of ma1 coefficients  of the 1000 MA(11)
+
+CI<- quantile(nasdaqboot$t[,1], probs = c(0.025,0.975)) #calculate the 95% confidence interval of the ma1 coefficient 
+plot(density(nasdaqboot$t[,1]))
+abline(v=0.9089411)
+abline(v=1.1350290)
